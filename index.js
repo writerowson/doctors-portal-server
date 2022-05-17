@@ -16,14 +16,34 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try {
         await client.connect()
-        const serviceCollection = client.db('Dentist').collection('service')
+        const serviceCollection = client.db('dentist').collection('service')
+        const bookingCollection = client.db('dentist').collection('booking')
 
+
+        //  Api naming convention
+        // *app.get('/booking) get all bokking or get plural booking
+        // *app.get('/booking/:id) get a specific booking
+        // *app.post('/booking) add a new booking
+        // *app.delete ('/booking/:id) get a specific booking delete
+        // *app.patch('/booking/:id) update booking
         app.get('/service', async (req, res) => {
             const query = {};
             const cursor = serviceCollection.find(query)
             const services = await cursor.toArray();
             res.send(services)
+            console.log(7 > 6 && 8 < 6 && 6 > 4)
+        });
+
+        app.post('/booking', async (req, res) => {
+            const booking = req.body;
+            //  to handle user entry 
+            const query = { treatment: booking.treatment, date: booking.date, patient: booking.patient }
+            const result = await bookingCollection.insertOne(booking)
         })
+
+
+
+
     }
     finally {
 
