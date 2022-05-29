@@ -1,9 +1,11 @@
 const express = require('express')
 const app = express()
 const cors = require('cors')
+const jwt = require('jsonwebtoken');
 require('dotenv').config()
 const { MongoClient, ServerApiVersion } = require('mongodb');
 const res = require('express/lib/response');
+const { verify } = require('jsonwebtoken');
 const port = process.env.PORT || 5000
 // use middleware
 app.use(cors())
@@ -12,6 +14,25 @@ app.use(express.json())
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster1.ti8fd.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`;
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+function verifyJWT(req, res, next) {
+    // console.log('abc');
+    const authHeader = req.headers.authorization
+    if (!authHeader) {
+        return res.status(401).send({ messege: 'UnAuthorized acces' })
+    }
+    const token = authHeader.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+        if (err) {
+            return res.status(403).send({ messege: 'Forbidden access' })
+        }
+        // console.log((decoded));
+        req.decoded = decoded;
+        next();
+    });
+}
+
+// video: 4.37
 
 async function run() {
     try {
@@ -26,7 +47,7 @@ async function run() {
         // *app.get('/booking/:id) get a specific booking
         // *app.post('/booking) add a new booking
         // *app.delete ('/booking/:id) get a specific booking delete
-        // *app.put('/booking/:id)upsert =update (if exists)/insert(if doesn't)
+        // *app.put('/booking/:id)upsert =update (if exists)/insert(if doesn't) this will not add 1 user 2nd time
         // *app.patch('/booking/:id) update booking
         app.get('/service', async (req, res) => {
             const query = {};
@@ -44,10 +65,12 @@ async function run() {
             const updateDoc = {
                 $set: user,
             };
-
             const result = await userCollection.updateOne(filter, updateDoc, options)
-            res.send(result)
+            const token = jwt.sign({ email: email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' })
+            res.send({ result, token })
+            //  my error not give  2nd bracket
         })
+
 
 
         app.get('/available', async (req, res) => {
@@ -76,11 +99,18 @@ async function run() {
             res.send(services)
         })
 
-        app.get('/booking', async (req, res) => {
+        app.get('/booking', verifyJWT, async (req, res) => {
             const patient = req.query.patient
-            const query = { patient: patient };
-            const bookings = await bookingCollection.find(query).toArray()
-            res.send(bookings)
+            const decodedEmail = req.decoded.email;
+            if (patient === decodedEmail) {
+                const query = { patient: patient };
+                const bookings = await bookingCollection.find(query).toArray()
+                res.send(bookings)
+            }
+            else {
+                return res.status(403).send({ messege: 'Forbidden access' })
+            }
+
         })
 
         app.post('/booking', async (req, res) => {
